@@ -27,9 +27,56 @@
         </div>
       </div>
 
+      <div class="card submitted-orders">
+        <div class="card-header">
+          <h3 class="card-title">Submitted Orders ({{ restockingOrders.length }})</h3>
+        </div>
+        <div v-if="restockingOrders.length === 0" class="empty-note">No submitted restocking orders.</div>
+        <div v-else class="table-container">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th class="col-order-number">{{ t('orders.table.orderNumber') }}</th>
+                <th class="col-customer">{{ t('orders.table.customer') }}</th>
+                <th class="col-items">{{ t('orders.table.items') }}</th>
+                <th class="col-status">{{ t('orders.table.status') }}</th>
+                <th class="col-date">{{ t('orders.table.orderDate') }}</th>
+                <th class="col-date">Delivery Lead Time</th>
+                <th class="col-value">{{ t('orders.table.totalValue') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in restockingOrders" :key="order.id">
+                <td class="col-order-number"><strong>{{ order.order_number }}</strong></td>
+                <td class="col-customer">{{ translateCustomerName(order.customer) }}</td>
+                <td class="col-items">
+                  <details class="items-details">
+                    <summary class="items-summary">
+                      {{ t('orders.itemsCount', { count: order.items.length }) }}
+                    </summary>
+                    <div class="items-dropdown">
+                      <div v-for="(item, idx) in order.items" :key="item.sku || idx" class="item-entry">
+                        <span class="item-name">{{ translateProductName(item.name) }}</span>
+                        <span class="item-meta">{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol }}{{ item.unit_price }}</span>
+                      </div>
+                    </div>
+                  </details>
+                </td>
+                <td class="col-status">
+                  <span class="badge info">{{ t('status.restocking') }}</span>
+                </td>
+                <td class="col-date">{{ formatDate(order.order_date) }}</td>
+                <td class="col-date">{{ getLeadTime(order.order_date) }}</td>
+                <td class="col-value"><strong>{{ currencySymbol }}{{ order.total_value.toLocaleString() }}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">{{ t('orders.allOrders') }} ({{ orders.length }})</h3>
+          <h3 class="card-title">{{ t('orders.allOrders') }} ({{ regularOrders.length }})</h3>
         </div>
         <div class="table-container">
           <table class="orders-table">
@@ -45,7 +92,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="order in orders" :key="order.id">
+              <tr v-for="order in regularOrders" :key="order.id">
                 <td class="col-order-number"><strong>{{ order.order_number }}</strong></td>
                 <td class="col-customer">{{ translateCustomerName(order.customer) }}</td>
                 <td class="col-items">
@@ -133,6 +180,22 @@ export default {
       return orders.value.filter(order => order.status === status)
     }
 
+    // Orders come back already filtered by warehouse/category/month from the API
+    const restockingOrders = computed(() =>
+      orders.value.filter(order => order.status === 'Restocking')
+    )
+    const regularOrders = computed(() =>
+      orders.value.filter(order => order.status !== 'Restocking')
+    )
+
+    // Delivery lead time: 7 days from order date
+    const getLeadTime = (orderDate) => {
+      const date = new Date(orderDate)
+      if (isNaN(date.getTime())) return '-'
+      date.setDate(date.getDate() + 7)
+      return `7 days (${formatDate(date)})`
+    }
+
     const getOrderStatusClass = (status) => {
       const statusMap = {
         'Delivered': 'success',
@@ -160,6 +223,9 @@ export default {
       loading,
       error,
       orders,
+      restockingOrders,
+      regularOrders,
+      getLeadTime,
       getOrdersByStatus,
       getOrderStatusClass,
       formatDate,
@@ -172,6 +238,15 @@ export default {
 </script>
 
 <style scoped>
+.submitted-orders {
+  margin-bottom: 1.5rem;
+}
+
+.empty-note {
+  padding: 1rem 1.5rem;
+  color: #64748b;
+}
+
 /* Fixed table layout to prevent column shifting */
 .orders-table {
   table-layout: fixed;
